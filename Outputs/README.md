@@ -1,3 +1,0 @@
-# Output readme
-
-Text...
