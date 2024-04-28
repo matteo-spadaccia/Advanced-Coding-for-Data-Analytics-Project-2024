@@ -18,7 +18,7 @@ def chatDOC (G, patient):
   '''
 
   import networkx as nx
-  from mdgJaccard import mdgJaccard
+  from Functions.mdgJaccard import mdgJaccard
 
   # Eventual activation of input-output chat mode if patient == None
   IO = True
@@ -240,7 +240,7 @@ def chatDOC (G, patient):
   return {'symptoms':symptoms[:inputSymptoms], 'diseases':diseases, 'diseasesAdditionalSymptoms':symptoms[inputSymptoms:], 'relevantSymptoms':[symptom for symptom in symptoms if symptom in relevantSymptoms], 'irrelevantSymptoms':[symptom for symptom in symptoms if symptom in irrelevantSymptoms], 'unrecognizedSymptoms':[symptom for symptom in symptoms if symptom in unrecognizedSymptoms], 'relevantDiseases':relevantDiseases, 'irrelevantDiseases':irrelevantDiseases, 'unrecognizedDiseases':[disease for disease in diseases if disease in unrecognizedDiseases], 'possibleDiseases': orderedPossibleDiseases, 'diagnosis':diagnosis, 'diagnosisSymptoms':orderedDiagnosisSymptoms, 'additionalSymptoms':orderedAdditionalSymptoms, 'anatomies':orderedAnatomies, 'compounds_sideEffectsNum':orderedCompounds_sideEffectsNum, 'bestCompoundPharmacologicClasses':orderedPharmacologicClasses}
 
 
-def visualizeDOC (DOCoutput):
+def visualizeDOC (G,DOCoutput):
   '''
   Function to graphically visualize outputs of the chatDOC function
   - - -
@@ -251,6 +251,213 @@ def visualizeDOC (DOCoutput):
   - - -
   '''
 
-  # TODO: insert code
+  import networkx as nx
+  import matplotlib.pyplot as plt
+  import matplotlib.patches as mpatches
 
-  return None
+  singleDisease = DOCoutput['possibleDiseases'] is None # if true, a single disease is univocally diagnosed
+  compoundExistence = DOCoutput['compounds_sideEffectsNum'] != []
+
+  V = nx.DiGraph()
+
+  # Extract data from the output (dictionary)
+  # base case
+  patientSymptoms = DOCoutput['symptoms']
+  patientDiseases = DOCoutput['diseases']
+  patientIrrelevantSymptoms = DOCoutput['irrelevantSymptoms']
+  patientIrrelevantDiseases = DOCoutput['irrelevantDiseases']
+  if singleDisease == True:
+    diagnosisNodes = DOCoutput['diagnosis']
+    topAnatomies = DOCoutput['anatomies'][:min(3, len(DOCoutput['anatomies']))]
+    additionalSymptoms = DOCoutput['additionalSymptoms'][:min(3, len(DOCoutput['additionalSymptoms']))]
+    if compoundExistence == True:
+      compoundInfo = DOCoutput['compounds_sideEffectsNum'][0]
+  else:
+    diagnosisNodes = DOCoutput['possibleDiseases']
+
+  posPatient = {}
+  posDiagnosis = {}
+
+  # DIAGNOSIS
+  # one disease found
+  if singleDisease:
+    diagnosisNodes = G.nodes[diagnosisNodes]['name']
+    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=diagnosisNodes, size = 4000)
+    posDiagnosis[diagnosisNodes] = (0, 0)
+
+    # diagnosis symp
+    x = 0
+    y = 1
+    count = 1
+    for symp in additionalSymptoms:
+      symp = G.nodes[symp]['name']
+      V.add_node(symp, color='lightpink', type='diagnosis', label=symp)
+      V.add_edge(diagnosisNodes, symp)
+      posDiagnosis[symp] = (x, y)
+      x += 0.5
+      if count % 2 == 0:
+        y += 0.2
+      else:
+        y += -0.2
+      count += 1
+
+    # diagnosis anatomy
+    x = 0
+    y = -1
+    count = 1
+    topAnatomies2 = []
+    for anatomy in topAnatomies:
+      anatomy = G.nodes[anatomy]['name']
+      topAnatomies2.append(anatomy)
+      V.add_node(anatomy, color='lightpink', type='anatomy', label=anatomy)
+      V.add_edge(diagnosisNodes, anatomy)
+      posDiagnosis[anatomy] = (x, y)
+      x += 0.5
+      if count % 2 == 0:
+        y += -0.2
+      else:
+        y += 0.2
+      count += 1
+
+    # compound node and info
+    if compoundExistence:
+      compoundNode, sideEffectsCount = compoundInfo
+      compoundNode = G.nodes[compoundNode]['name']
+      if DOCoutput['bestCompoundPharmacologicClasses']:
+        pharmacologicClass = DOCoutput['bestCompoundPharmacologicClasses'][0]
+        pharmacologicClass = G.nodes[pharmacologicClass]['name']
+        V.add_node(compoundNode, color='lightpink', type='diagnosis',
+                    label=f"Compound: {compoundNode}\nPharmacological class: {pharmacologicClass}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])}")
+        V.add_edge(diagnosisNodes, compoundNode)
+        posDiagnosis[compoundNode] = (1, 0)
+      else:
+        V.add_node(compoundNode, color='lightpink', type='diagnosis',
+                    label=f"Compound: {compoundNode}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])}")
+        V.add_edge(diagnosisNodes, compoundNode)
+        posDiagnosis[compoundNode] = (1, 0)
+
+  # many possible diagnosis
+  else:
+    diagnosisLabel = '\n'.join(G.nodes[disease]['name'] for disease in diagnosisNodes)
+    listPossibleDiseases = diagnosisNodes
+    listPossibleDiseases2 = []
+    for dis in listPossibleDiseases:
+      listPossibleDiseases2.append(G.nodes[dis]['name'])
+    diagnosisNodes = 'diagnosisNodes'
+    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=f"You may have one of\nthe following diseases:\n{diagnosisLabel}", size = 4000)
+    posDiagnosis[diagnosisNodes] = (0, 0)
+
+  # PATIENT
+  # symptoms
+  if len(patientSymptoms+patientDiseases) <= 1:
+    y = 0
+    increment = 0
+  else:
+    y = 1
+    z = -1
+    increment = 2/(len(patientSymptoms+patientDiseases)-1)
+  for symp in patientSymptoms:
+    if symp not in patientIrrelevantSymptoms:
+      symp = G.nodes[symp]['name']
+      V.add_node(symp, color='lightgreen', type='patient', label=symp)
+      V.add_edge(diagnosisNodes, symp)
+      posPatient[symp] = (-1, y)
+      y += -increment
+    else:
+      symp = G.nodes[symp]['name']
+      V.add_node(symp, color='lightgrey', type='patient', label=symp)
+      posPatient[symp] = (-1, y)
+      y += -increment
+
+  # diseases
+  patientIrrelevantDiseases2 = []
+  for dis in patientIrrelevantDiseases:
+    patientIrrelevantDiseases2.append(G.nodes[dis]['name'])
+
+  if singleDisease:
+    for disease in patientDiseases:
+      disease = G.nodes[disease]['name']
+      if disease == diagnosisNodes:
+        disease = 'malattia'
+        V.add_node(disease, color='lightpink', type='patient', label=diagnosisNodes)
+        posPatient[disease] = (-1, z)
+        V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
+        z += increment
+      elif disease not in patientIrrelevantDiseases2:
+        V.add_node(disease, color='lightgreen', type='patient', label=disease)
+        posPatient[disease] = (-1, z)
+        V.add_edge(diagnosisNodes, disease)
+        z += increment
+      else:
+        V.add_node(disease, color='lightgrey', type='patient', label=disease)
+        posPatient[disease] = (-1, z)
+        z += increment
+
+  else:
+    for disease in patientDiseases:
+      disease = G.nodes[disease]['name']
+      if disease in listPossibleDiseases2:
+        V.add_node(disease, color='lightpink', type='patient', label=disease)
+        posPatient[disease] = (-1, z)
+        V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
+        z += increment
+      elif disease not in patientIrrelevantDiseases2:
+        disease = G.nodes[disease]['name']
+        V.add_node(disease, color='lightgreen', type='patient', label=disease)
+        posPatient[disease] = (-1, z)
+        V.add_edge(diagnosisNodes, disease)
+        z += increment
+      else:
+        V.add_node(disease, color='lightgrey', type='patient', label=disease)
+        posPatient[disease] = (-1, z)
+        z += increment
+
+
+
+  # Draw the graph
+  pos = {**posPatient,**posDiagnosis}
+  colors = [V.nodes[node].get('color', 'grey') for node in V]
+  labels = {node: V.nodes[node].get('label', node) for node in V}
+  sizes = [V.nodes[node].get('size', 500) for node in V]
+
+  edges = V.edges(data=True)
+  colorsEdge = [edge[2].get('color', 'grey') for edge in edges]
+  widthsEdge = [edge[2].get('width', 1.0) for edge in edges]
+  labelsEdge = nx.get_edge_attributes(V, 'label')
+
+  plt.figure(figsize=(10, 10))
+
+  plt.title('Patient Graph', fontsize=20, fontweight='bold')
+
+  # Custom legend
+  pink_patch = mpatches.Patch(color='lightpink', label='Diagnosed disease, main symptoms, anatomy, compound')
+  green_patch = mpatches.Patch(color='lightgreen', label='Connected symptoms')
+  grey_patch = mpatches.Patch(color='lightgrey', label='Not connected symptoms')
+  plt.legend(title="Legend", handles=[pink_patch, green_patch, grey_patch], loc='upper right', bbox_to_anchor=(1.8, 0.8))
+
+
+  nx.draw_networkx_nodes(V, pos, node_color=colors, node_size=sizes)
+  nx.draw_networkx_edges(V, pos, edge_color=colorsEdge, width=widthsEdge, arrowstyle='-|>', arrowsize=20)
+  nx.draw_networkx_edge_labels(V, pos, edge_labels=labelsEdge)
+
+  plt.axis('off')
+
+  # Disegna le etichette dei nodi usando la posizione aggiustata per tutte le etichette
+  if singleDisease:
+    for node, (x, y) in pos.items():
+      if node == diagnosisNodes:
+        plt.text(x, y - 0.05, labels[node], fontsize=12, ha='center', va='center')
+      elif node in topAnatomies2:
+        plt.text(x, y - 0.13, labels[node], fontsize=12, ha='center', va='bottom')
+      elif compoundExistence and node == compoundNode:
+        plt.text(x + 0.05, y, labels[node], fontsize=12, ha='left', va='center')
+      else:
+        plt.text(x, y + 0.08, labels[node], fontsize=12, ha='center', va='center')
+  else:
+    for node, (x, y) in pos.items():
+      if node == diagnosisNodes:
+        plt.text(x + 0.2, y, labels[node], fontsize=12, ha='center', va='center')
+      else:
+        plt.text(x, y + 0.0003, labels[node], fontsize=12, ha='center', va='center')
+  
+  return plt
