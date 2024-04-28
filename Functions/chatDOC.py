@@ -423,7 +423,7 @@ def visualizeDOC (G,DOCoutput):
 
   # Custom legend
   pink_patch = mpatches.Patch(color='lightpink', label='Diagnosed disease, main symptoms, anatomy, compound')
-  green_patch = mpatches.Patch(color='lightgreen', label='Connected symptoms')
+  green_patch = mpatches.Patch(color='darkgray', label='Connected symptoms')
   grey_patch = mpatches.Patch(color='lightgrey', label='Not connected symptoms')
   plt.legend(title="Legend", handles=[pink_patch, green_patch, grey_patch], loc='upper right', bbox_to_anchor=(1.8, 0.8))
 
