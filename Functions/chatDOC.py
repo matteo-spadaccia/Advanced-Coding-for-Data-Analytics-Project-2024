@@ -264,6 +264,8 @@ def visualizeDOC (G,DOCoutput):
   # base case
   patientSymptoms = DOCoutput['symptoms']
   patientDiseases = DOCoutput['diseases']
+  patientRelevantSymptoms = DOCoutput['relevantSymptoms']
+  patientRelevantDiseases = DOCoutput['relevantDiseases']
   patientIrrelevantSymptoms = DOCoutput['irrelevantSymptoms']
   patientIrrelevantDiseases = DOCoutput['irrelevantDiseases']
   if singleDisease == True:
@@ -271,7 +273,7 @@ def visualizeDOC (G,DOCoutput):
     topAnatomies = DOCoutput['anatomies'][:min(3, len(DOCoutput['anatomies']))]
     additionalSymptoms = DOCoutput['additionalSymptoms'][:min(3, len(DOCoutput['additionalSymptoms']))]
     if diagnosisNodes in patientDiseases:
-      additionalSymptoms = DOCoutput['diagnosisSymptoms']
+      additionalSymptoms = [symptom for symptom in DOCoutput['diagnosisSymptoms'] if symptom in set(DOCoutput['diagnosisSymptoms'])-set(DOCoutput['symptoms'])][:min(3, len(DOCoutput['diagnosisSymptoms']))]
     if compoundExistence == True:
       compoundInfo = DOCoutput['compounds_sideEffectsNum'][0]
   else:
@@ -284,7 +286,7 @@ def visualizeDOC (G,DOCoutput):
   # one disease found
   if singleDisease:
     diagnosisNodes = G.nodes[diagnosisNodes]['name']
-    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=diagnosisNodes, size = 4000)
+    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=diagnosisNodes.upper(), size = 4000)
     posDiagnosis[diagnosisNodes] = (0, 0)
 
     # diagnosis symp
@@ -334,32 +336,36 @@ def visualizeDOC (G,DOCoutput):
         posDiagnosis[compoundNode] = (1, 0)
       else:
         V.add_node(compoundNode, color='lightpink', type='diagnosis',
-                    label=f"Compound: {compoundNode}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])}")
+                    label=f"COMPOUND: {compoundNode}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])-1}")
         V.add_edge(diagnosisNodes, compoundNode)
         posDiagnosis[compoundNode] = (1, 0)
 
-  # many possible diagnosis
+  # many possible diagnoses
   else:
-    diagnosisLabel = '\n'.join(G.nodes[disease]['name'] for disease in diagnosisNodes)
+    diagnosisLabel = '\n'.join(G.nodes[disease]['name'] for disease in diagnosisNodes[:min(3,len(diagnosisNodes))])
+    if len(diagnosisNodes) > 3:
+      diagnosisLabel = diagnosisLabel+f"\n(or one of other {len(diagnosisNodes)-3} diseases)"
     listPossibleDiseases = diagnosisNodes
     listPossibleDiseases2 = []
     for dis in listPossibleDiseases:
       listPossibleDiseases2.append(G.nodes[dis]['name'])
     diagnosisNodes = 'diagnosisNodes'
-    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=f"You may have one of\nthe following diseases:\n{diagnosisLabel}", size = 4000)
+    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=f"YOU MAY HAVE:\n{diagnosisLabel}\n", size = 4000)
     posDiagnosis[diagnosisNodes] = (0, 0)
 
   # PATIENT
   # symptoms
-  if len(patientSymptoms+patientDiseases) <= 1:
-    y = 0
-    increment = 0
-  else:
+  try:
+    increment = 2/(len(patientSymptoms+patientDiseases)-1)
     y = 1
     z = -1
-    increment = 2/(len(patientSymptoms+patientDiseases)-1)
+    singleSymptom = False
+  except:
+    y = 0
+    increment = 0
+    singleSymptom = True
   for symp in patientSymptoms:
-    if symp not in patientIrrelevantSymptoms:
+    if symp in patientRelevantSymptoms:
       symp = G.nodes[symp]['name']
       V.add_node(symp, color='lightgreen', type='patient', label=symp)
       V.add_edge(diagnosisNodes, symp)
@@ -375,36 +381,20 @@ def visualizeDOC (G,DOCoutput):
   patientIrrelevantDiseases2 = []
   for dis in patientIrrelevantDiseases:
     patientIrrelevantDiseases2.append(G.nodes[dis]['name'])
-
-  if singleDisease:
-    for disease in patientDiseases:
+  patientRelevantDiseases2 = []
+  for dis in patientRelevantDiseases:
+    patientRelevantDiseases2.append(G.nodes[dis]['name'])
+  
+  if patientDiseases != []:
+    for disease in patientDiseases.reverse():
       disease = G.nodes[disease]['name']
-      if disease == diagnosisNodes:
+      if (singleDisease and disease == diagnosisNodes) or (not singleDisease and disease in listPossibleDiseases2):
         disease = 'malattia'
         V.add_node(disease, color='lightpink', type='patient', label=diagnosisNodes)
         posPatient[disease] = (-1, z)
         V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
         z += increment
-      elif disease not in patientIrrelevantDiseases2:
-        V.add_node(disease, color='lightgreen', type='patient', label=disease)
-        posPatient[disease] = (-1, z)
-        V.add_edge(diagnosisNodes, disease)
-        z += increment
-      else:
-        V.add_node(disease, color='lightgrey', type='patient', label=disease)
-        posPatient[disease] = (-1, z)
-        z += increment
-
-  else:
-    for disease in patientDiseases:
-      disease = G.nodes[disease]['name']
-      if disease in listPossibleDiseases2:
-        V.add_node(disease, color='lightpink', type='patient', label=disease)
-        posPatient[disease] = (-1, z)
-        V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
-        z += increment
-      elif disease not in patientIrrelevantDiseases2:
-        disease = G.nodes[disease]['name']
+      elif disease in patientRelevantDiseases2:
         V.add_node(disease, color='lightgreen', type='patient', label=disease)
         posPatient[disease] = (-1, z)
         V.add_edge(diagnosisNodes, disease)
@@ -420,7 +410,7 @@ def visualizeDOC (G,DOCoutput):
   pos = {**posPatient,**posDiagnosis}
   colors = [V.nodes[node].get('color', 'grey') for node in V]
   labels = {node: V.nodes[node].get('label', node) for node in V}
-  sizes = [V.nodes[node].get('size', 500) for node in V]
+  sizes = [V.nodes[node].get('size', 350) for node in V]
 
   edges = V.edges(data=True)
   colorsEdge = [edge[2].get('color', 'grey') for edge in edges]
@@ -448,18 +438,27 @@ def visualizeDOC (G,DOCoutput):
   if singleDisease:
     for node, (x, y) in pos.items():
       if node == diagnosisNodes:
-        plt.text(x, y - 0.05, labels[node], fontsize=12, ha='center', va='center')
+        plt.text(x, y - 0.05, labels[node], fontsize=12, fontweight = 'bold', ha='center', va='center')
       elif node in topAnatomies2:
-        plt.text(x, y - 0.13, labels[node], fontsize=12, ha='center', va='bottom')
+        plt.text(x, y - 0.115, labels[node], fontsize=12, ha='center', va='bottom')
       elif compoundExistence and node == compoundNode:
-        plt.text(x + 0.05, y, labels[node], fontsize=12, ha='left', va='center')
+        plt.text(x + 0.07, y, labels[node], fontsize=12, ha='left', va='center')
+      elif node in {G.nodes[disease]['name'] for disease in patientDiseases}:
+        plt.text(x, y - 0.09, labels[node], fontsize=12, ha='center', va='center')
       else:
         plt.text(x, y + 0.08, labels[node], fontsize=12, ha='center', va='center')
   else:
     for node, (x, y) in pos.items():
-      if node == diagnosisNodes:
-        plt.text(x + 0.2, y, labels[node], fontsize=12, ha='center', va='center')
+      if node == diagnosisNodes and not singleSymptom:
+        plt.text(x + 0.2, y, labels[node], fontsize=12, ha='left', va='center')
+      elif node == diagnosisNodes and singleSymptom:
+        plt.text(x + 0.1, y, labels[node], fontsize=12, ha='left', va='center')
+      elif node in {G.nodes[disease]['name'] for disease in patientDiseases}:
+        plt.text(x, y - 0.09, labels[node], fontsize=12, ha='center', va='center')
       else:
-        plt.text(x, y + 0.0003, labels[node], fontsize=12, ha='center', va='center')
+        if not singleSymptom:
+          plt.text(x, y + 0.08, labels[node], fontsize=12, ha='center', va='center')
+        else:
+          plt.text(x, y, labels[node], fontsize=12, ha='center', va='center')
   
   return plt
