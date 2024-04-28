@@ -270,6 +270,8 @@ def visualizeDOC (G,DOCoutput):
     diagnosisNodes = DOCoutput['diagnosis']
     topAnatomies = DOCoutput['anatomies'][:min(3, len(DOCoutput['anatomies']))]
     additionalSymptoms = DOCoutput['additionalSymptoms'][:min(3, len(DOCoutput['additionalSymptoms']))]
+    if diagnosisNodes in patientDiseases:
+      additionalSymptoms = DOCoutput['diagnosisSymptoms']
     if compoundExistence == True:
       compoundInfo = DOCoutput['compounds_sideEffectsNum'][0]
   else:
