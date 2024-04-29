@@ -39,6 +39,7 @@ def chatDOC (G, patient):
         symptoms = [id for id,attr in G.nodes(data=True) if mainSymptom.lower() in attr['name'].lower() and attr['kind'] == 'Symptom' and len(mainSymptom) > 2]
     if len(symptoms) > 1:
       print("There are", len(symptoms), "symptoms related to your description:")
+      symptoms = [symptom[0] for symptom in sorted([(symptom,G.in_degree(symptom)) for symptom in symptoms], key=lambda x:x[1])]
       for i in range(len(symptoms)):
         print(i+1, "-", G.nodes[symptoms[i]]['name'])
       selection = -1
@@ -94,6 +95,7 @@ def chatDOC (G, patient):
             relevantSymptom = symptomIDs[0]
           elif IO:
             print("There are ", len(symptomIDs), " symptoms related to your description '", symptom, "':", sep = '')
+            symptomIDs = [symptom[0] for symptom in sorted([(symptom,G.in_degree(symptom)) for symptom in symptomIDs], key=lambda x:x[1])]
             for i in range(len(symptomIDs)):
               print(i+1, "-", G.nodes[symptomIDs[i]]['name'])
             selection = -1
@@ -115,7 +117,7 @@ def chatDOC (G, patient):
           relevantSymptoms = relevantSymptoms | {relevantSymptom}
           possibleDiseases = possibleDiseases & {disease for disease in G.predecessors(relevantSymptom)}
           possibleSymptoms = {possibleSymptom for possibleDisease in possibleDiseases for possibleSymptom in G.neighbors(possibleDisease) if possibleSymptom[:7]=='Symptom'} - (relevantSymptoms | irrelevantSymptoms)
-        else:
+        elif relevantSymptom not in relevantSymptoms:
           irrelevantSymptoms = irrelevantSymptoms | {relevantSymptom}
       if IO and len(unrecognizedSymptoms) > 0:
         print("The following inputs are not recognizable as symptoms:", '; '.join(unrecognizedSymptoms), "!")
@@ -123,7 +125,7 @@ def chatDOC (G, patient):
         print("The following symptoms you described seem to be uncorrelated to the main ones: ", '; '.join([G.nodes[symptom]['name'] for symptom in irrelevantSymptoms]), "!")
   inputSymptoms = len(symptoms)
 
-  # Asking for eventually already diagnosticated diseases, causing symptoms which could be correlated to the searched disease too
+  # Asking for eventually already diagnosed diseases, causing symptoms which could be correlated to the searched disease too
   unrecognizedDiseases = set()
   diseases = []
   if not IO:
@@ -155,6 +157,7 @@ def chatDOC (G, patient):
             relevantDisease = diseaseIDs[0]
           elif IO:
             print("There are ", len(diseaseIDs), " diseases related to your description '", disease, "':", sep = '')
+            diseaseIDs = [disease[0] for disease in sorted([(disease,G.in_degree(disease)) for disease in diseaseIDs], key=lambda x:x[1])]
             for i in range(len(diseaseIDs)):
               print(i+1, "-", G.nodes[diseaseIDs[i]]['name'])
             selection = -1
@@ -179,7 +182,7 @@ def chatDOC (G, patient):
             relevantSymptoms = relevantSymptoms | {relevantSymptom}
             possibleDiseases = possibleDiseases & {disease for disease in G.predecessors(relevantSymptom)}
             possibleSymptoms = {possibleSymptom for possibleDisease in possibleDiseases for possibleSymptom in G.neighbors(possibleDisease) if possibleSymptom[:7]=='Symptom'} - (relevantSymptoms | irrelevantSymptoms)
-          else:
+          elif relevantSymptom not in relevantSymptoms:
             irrelevantSymptoms = irrelevantSymptoms | {relevantSymptom}
       if IO and len(unrecognizedDiseases) > 0:
         print("The following inputs are not recognizable as diseases:", '; '.join(unrecognizedDiseases), "!")
@@ -196,7 +199,9 @@ def chatDOC (G, patient):
         print("Input not recognized, please just answer yes or no to the following question!")
         YN = input("Do you maybe feel this symptom too?\t" + G.nodes[possibleSymptomsSimilarity[i][0]]['name'] + "\t[Y/N]\t").lower()
       if YN in ['y', 'yes']:
-        symptoms = symptoms + [possibleSymptomsSimilarity[i][0]]
+        symptoms.append(possibleSymptomsSimilarity[i][0])
+        inputSymptoms += 1
+        relevantSymptoms = relevantSymptoms|{possibleSymptomsSimilarity[i][0]}
         possibleDiseases = possibleDiseases & set(G.predecessors(possibleSymptomsSimilarity[i][0]))
       i += 1
 
@@ -222,22 +227,28 @@ def chatDOC (G, patient):
     orderedCompounds_sideEffectsNum = None
     orderedPharmacologicClasses = None
   if IO:
-    print("The relevant symptoms are:", '; '.join([G.nodes[symptom]['name'] for symptom in symptoms if symptom in relevantSymptoms]), "!")
+    print("The relevant symptoms detected are:", '; '.join([G.nodes[symptom]['name'] for symptom in symptoms[:inputSymptoms] if symptom in relevantSymptoms]), "!")
+    if len(relevantDiseases) > 0:
+      print("The relevant diseases detected are:", '; '.join([G.nodes[disease]['name'] for disease in diseases if disease in relevantDiseases]), "!")
     if diagnosis != None:
-      print("You may have this disease:", G.nodes[diagnosis]['name'])
-      print("Therefore, you may also recognize the following main symptoms:", '; '.join([G.nodes[symptom]['name'] for symptom in orderedAdditionalSymptoms[:min(5,len(orderedAdditionalSymptoms))]]), "!")
-      print("The main affected anatomies could be:", '; '.join(G.nodes[anatomy]['name'] for anatomy in orderedAnatomies[:min(5,len(orderedAnatomies))]), "!")
+      if diagnosis in diseases:
+        print("Therefore, I would just confirm your diagnosis for this disease:", G.nodes[diagnosis]['name'], "!")
+      else:
+        print("You may have this disease:", G.nodes[diagnosis]['name'], "!")
+        if len(orderedAdditionalSymptoms) > 0:
+          print("Therefore, you may also recognize the following main symptoms:", '; '.join([G.nodes[symptom]['name'] for symptom in orderedAdditionalSymptoms[:min(3,len(orderedAdditionalSymptoms))]]), "!")
+      print("The main affected anatomies could be:", '; '.join(G.nodes[anatomy]['name'] for anatomy in orderedAnatomies[:min(3,len(orderedAnatomies))]), "!")
       print("There are", len(orderedCompounds_sideEffectsNum), "compounds that may treat the disease!")
       if len(orderedCompounds_sideEffectsNum) > 0:
         print("The suggested compound is:", G.nodes[orderedCompounds_sideEffectsNum[0][0]]['name'], "(with", orderedCompounds_sideEffectsNum[0][1], "side effects)!")
         if len(orderedPharmacologicClasses)==1:
           print("The relevant pharmacologic class is:", G.nodes[orderedPharmacologicClasses[0]]['name'], "!")
         elif len(orderedPharmacologicClasses)>1:
-          print("The relevant pharmacologic classes are:", '; '.join([G.nodes[pharmacologicClass]['name'] for pharmacologicClass in orderedPharmacologicClasses[:min(5,len(orderedPharmacologicClasses))]]), "!")
+          print("The relevant pharmacologic classes are:", '; '.join([G.nodes[pharmacologicClass]['name'] for pharmacologicClass in orderedPharmacologicClasses[:min(3,len(orderedPharmacologicClasses))]]), "!")
     else:
-      print("Thus your disease may be one of the following:", '; '.join([G.nodes[disease]['name'] for disease in orderedPossibleDiseases[:min(5,len(orderedPossibleDiseases))]]), "!")
+      print("Thus your disease may be one of the following:", '; '.join([G.nodes[disease]['name'] for disease in orderedPossibleDiseases[:min(3,len(orderedPossibleDiseases))]]), "!")
 
-  return {'symptoms':symptoms[:inputSymptoms], 'diseases':diseases, 'diseasesAdditionalSymptoms':symptoms[inputSymptoms:], 'relevantSymptoms':[symptom for symptom in symptoms if symptom in relevantSymptoms], 'irrelevantSymptoms':[symptom for symptom in symptoms if symptom in irrelevantSymptoms], 'unrecognizedSymptoms':[symptom for symptom in symptoms if symptom in unrecognizedSymptoms], 'relevantDiseases':relevantDiseases, 'irrelevantDiseases':irrelevantDiseases, 'unrecognizedDiseases':[disease for disease in diseases if disease in unrecognizedDiseases], 'possibleDiseases': orderedPossibleDiseases, 'diagnosis':diagnosis, 'diagnosisSymptoms':orderedDiagnosisSymptoms, 'additionalSymptoms':orderedAdditionalSymptoms, 'anatomies':orderedAnatomies, 'compounds_sideEffectsNum':orderedCompounds_sideEffectsNum, 'bestCompoundPharmacologicClasses':orderedPharmacologicClasses}
+  return {'symptoms':symptoms[:inputSymptoms], 'diseases':diseases, 'diseasesAdditionalSymptoms':symptoms[inputSymptoms:], 'relevantSymptoms':[symptom for symptom in symptoms if symptom in relevantSymptoms], 'irrelevantSymptoms':[symptom for symptom in symptoms if symptom in irrelevantSymptoms], 'unrecognizedSymptoms':[symptom for symptom in symptoms if symptom in unrecognizedSymptoms], 'relevantDiseases':[disease for disease in diseases if disease in relevantDiseases], 'irrelevantDiseases':[disease for disease in diseases if disease in irrelevantDiseases], 'unrecognizedDiseases':[disease for disease in diseases if disease in unrecognizedDiseases], 'possibleDiseases': orderedPossibleDiseases, 'diagnosis':diagnosis, 'diagnosisSymptoms':orderedDiagnosisSymptoms, 'additionalSymptoms':orderedAdditionalSymptoms, 'anatomies':orderedAnatomies, 'compounds_sideEffectsNum':orderedCompounds_sideEffectsNum, 'bestCompoundPharmacologicClasses':orderedPharmacologicClasses}
 
 
 def visualizeDOC (G,DOCoutput):
@@ -254,20 +265,22 @@ def visualizeDOC (G,DOCoutput):
   import networkx as nx
   import matplotlib.pyplot as plt
   import matplotlib.patches as mpatches
-
+  
   singleDisease = DOCoutput['possibleDiseases'] is None # if true, a single disease is univocally diagnosed
   compoundExistence = DOCoutput['compounds_sideEffectsNum'] != []
-
   V = nx.DiGraph()
-
-  # Extract data from the output (dictionary)
-  # base case
+  posPatient = {}
+  posDiagnosis = {}
+  
+  # Extracting data from chatDOC's output dictionary
   patientSymptoms = DOCoutput['symptoms']
   patientDiseases = DOCoutput['diseases']
   patientRelevantSymptoms = DOCoutput['relevantSymptoms']
   patientRelevantDiseases = DOCoutput['relevantDiseases']
   patientIrrelevantSymptoms = DOCoutput['irrelevantSymptoms']
   patientIrrelevantDiseases = DOCoutput['irrelevantDiseases']
+  patientUnrecognizedSymptoms = DOCoutput['unrecognizedSymptoms']
+  patientUnrecognizedDiseases = DOCoutput['unrecognizedDiseases']
   if singleDisease == True:
     diagnosisNodes = DOCoutput['diagnosis']
     topAnatomies = DOCoutput['anatomies'][:min(3, len(DOCoutput['anatomies']))]
@@ -278,24 +291,20 @@ def visualizeDOC (G,DOCoutput):
       compoundInfo = DOCoutput['compounds_sideEffectsNum'][0]
   else:
     diagnosisNodes = DOCoutput['possibleDiseases']
-
-  posPatient = {}
-  posDiagnosis = {}
-
-  # DIAGNOSIS
-  # one disease found
+  
+  # Preparing the DIAGNOSIS visualization's side
   if singleDisease:
     diagnosisNodes = G.nodes[diagnosisNodes]['name']
     V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=diagnosisNodes.upper(), size = 4000)
     posDiagnosis[diagnosisNodes] = (0, 0)
 
-    # diagnosis symp
+    # Main symptoms caused
     x = 0
     y = 1
     count = 1
     for symp in additionalSymptoms:
       symp = G.nodes[symp]['name']
-      V.add_node(symp, color='lightpink', type='diagnosis', label=symp)
+      V.add_node(symp, color='lightblue', type='diagnosis', label=symp)
       V.add_edge(diagnosisNodes, symp)
       posDiagnosis[symp] = (x, y)
       x += 0.5
@@ -305,7 +314,7 @@ def visualizeDOC (G,DOCoutput):
         y += -0.2
       count += 1
 
-    # diagnosis anatomy
+    # Main anatomies affected
     x = 0
     y = -1
     count = 1
@@ -313,7 +322,7 @@ def visualizeDOC (G,DOCoutput):
     for anatomy in topAnatomies:
       anatomy = G.nodes[anatomy]['name']
       topAnatomies2.append(anatomy)
-      V.add_node(anatomy, color='lightpink', type='anatomy', label=anatomy)
+      V.add_node(anatomy, color='khaki', type='anatomy', label=anatomy)
       V.add_edge(diagnosisNodes, anatomy)
       posDiagnosis[anatomy] = (x, y)
       x += 0.5
@@ -323,40 +332,37 @@ def visualizeDOC (G,DOCoutput):
         y += 0.2
       count += 1
 
-    # compound node and info
+    # Possible compound information
     if compoundExistence:
       compoundNode, sideEffectsCount = compoundInfo
       compoundNode = G.nodes[compoundNode]['name']
       if DOCoutput['bestCompoundPharmacologicClasses']:
         pharmacologicClass = DOCoutput['bestCompoundPharmacologicClasses'][0]
         pharmacologicClass = G.nodes[pharmacologicClass]['name']
-        V.add_node(compoundNode, color='lightpink', type='diagnosis',
-                    label=f"Compound: {compoundNode}\nPharmacological class: {pharmacologicClass}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])}")
+        V.add_node(compoundNode, color='mediumpurple', type='diagnosis',
+                    label=f"COMPOUND: {compoundNode}\nPharmacological class: {pharmacologicClass}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])-1}")
         V.add_edge(diagnosisNodes, compoundNode)
-        posDiagnosis[compoundNode] = (1, 0)
       else:
-        V.add_node(compoundNode, color='lightpink', type='diagnosis',
+        V.add_node(compoundNode, color='mediumpurple', type='diagnosis',
                     label=f"COMPOUND: {compoundNode}\nNumber of side effects: {sideEffectsCount}\nNumber of alternatives: {len(DOCoutput['compounds_sideEffectsNum'])-1}")
         V.add_edge(diagnosisNodes, compoundNode)
-        posDiagnosis[compoundNode] = (1, 0)
-
-  # many possible diagnoses
-  else:
+      posDiagnosis[compoundNode] = (1, 0)
+  
+  else: # case with no univocal diagnosis, but many possible diseases
     diagnosisLabel = '\n'.join(G.nodes[disease]['name'] for disease in diagnosisNodes[:min(3,len(diagnosisNodes))])
     if len(diagnosisNodes) > 3:
-      diagnosisLabel = diagnosisLabel+f"\n(or one of other {len(diagnosisNodes)-3} diseases)"
+      diagnosisLabel = diagnosisLabel+f"\n(or other {len(diagnosisNodes)-3} diseases)"
     listPossibleDiseases = diagnosisNodes
     listPossibleDiseases2 = []
     for dis in listPossibleDiseases:
       listPossibleDiseases2.append(G.nodes[dis]['name'])
     diagnosisNodes = 'diagnosisNodes'
-    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=f"YOU MAY HAVE:\n{diagnosisLabel}\n", size = 4000)
+    V.add_node(diagnosisNodes, color='lightpink', type='diagnosis', label=f"POSSIBLE DIAGNOSES:\n{diagnosisLabel}\n", size = 4000)
     posDiagnosis[diagnosisNodes] = (0, 0)
 
-  # PATIENT
-  # symptoms
+  # Preparing the PATIENT visualization's side
   try:
-    increment = 2/(len(patientSymptoms+patientDiseases)-1)
+    increment = 2/(len(patientSymptoms+patientDiseases)-len(patientUnrecognizedSymptoms+patientUnrecognizedDiseases)-1)
     y = 1
     z = -1
     singleSymptom = False
@@ -364,6 +370,8 @@ def visualizeDOC (G,DOCoutput):
     y = 0
     increment = 0
     singleSymptom = True
+  
+  # Known symptoms
   for symp in patientSymptoms:
     if symp in patientRelevantSymptoms:
       symp = G.nodes[symp]['name']
@@ -371,70 +379,71 @@ def visualizeDOC (G,DOCoutput):
       V.add_edge(diagnosisNodes, symp)
       posPatient[symp] = (-1, y)
       y += -increment
-    else:
+    elif symp in patientIrrelevantSymptoms:
       symp = G.nodes[symp]['name']
       V.add_node(symp, color='lightgrey', type='patient', label=symp)
       posPatient[symp] = (-1, y)
       y += -increment
 
-  # diseases
+  # Known diseases
   patientIrrelevantDiseases2 = []
   for dis in patientIrrelevantDiseases:
     patientIrrelevantDiseases2.append(G.nodes[dis]['name'])
   patientRelevantDiseases2 = []
   for dis in patientRelevantDiseases:
     patientRelevantDiseases2.append(G.nodes[dis]['name'])
-  
-  if patientDiseases != []:
-    for disease in patientDiseases.reverse():
-      disease = G.nodes[disease]['name']
-      if (singleDisease and disease == diagnosisNodes) or (not singleDisease and disease in listPossibleDiseases2):
-        disease = 'malattia'
-        V.add_node(disease, color='lightpink', type='patient', label=diagnosisNodes)
-        posPatient[disease] = (-1, z)
-        V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
-        z += increment
-      elif disease in patientRelevantDiseases2:
-        V.add_node(disease, color='lightgreen', type='patient', label=disease)
-        posPatient[disease] = (-1, z)
-        V.add_edge(diagnosisNodes, disease)
-        z += increment
-      else:
-        V.add_node(disease, color='lightgrey', type='patient', label=disease)
-        posPatient[disease] = (-1, z)
-        z += increment
+  corresponding = False
+  for disease in patientDiseases[::-1]:
+    disease = G.nodes[disease]['name']
+    if (singleDisease and disease == diagnosisNodes) or (not singleDisease and disease in listPossibleDiseases2):
+      corresponding = True
+      disease = 'malattia'
+      V.add_node(disease, color='lightpink', type='patient', label=diagnosisNodes)
+      posPatient[disease] = (-1, z)
+      V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
+      z += increment
+    elif disease in patientRelevantDiseases2:
+      V.add_node(disease, color='salmon', type='patient', label=disease)
+      posPatient[disease] = (-1, z)
+      V.add_edge(diagnosisNodes, disease)
+      z += increment
+    elif disease in patientIrrelevantDiseases2:
+      V.add_node(disease, color='lightgrey', type='patient', label=disease)
+      posPatient[disease] = (-1, z)
+      z += increment
 
-
-
-  # Draw the graph
+  # Generating the VISUALIZATION
   pos = {**posPatient,**posDiagnosis}
   colors = [V.nodes[node].get('color', 'grey') for node in V]
   labels = {node: V.nodes[node].get('label', node) for node in V}
   sizes = [V.nodes[node].get('size', 350) for node in V]
-
   edges = V.edges(data=True)
   colorsEdge = [edge[2].get('color', 'grey') for edge in edges]
   widthsEdge = [edge[2].get('width', 1.0) for edge in edges]
   labelsEdge = nx.get_edge_attributes(V, 'label')
 
+  # Structure
   plt.figure(figsize=(10, 10))
-
-  plt.title('Patient Graph', fontsize=20, fontweight='bold')
-
-  # Custom legend
-  pink_patch = mpatches.Patch(color='lightpink', label='Diagnosed disease, main symptoms, anatomy, compound')
-  green_patch = mpatches.Patch(color='darkgray', label='Connected symptoms')
-  grey_patch = mpatches.Patch(color='lightgrey', label='Not connected symptoms')
-  plt.legend(title="Legend", handles=[pink_patch, green_patch, grey_patch], loc='upper right', bbox_to_anchor=(1.8, 0.8))
-
-
+  plt.title("chatDOC's diagnostic analysis", fontsize=20, fontweight='bold')
   nx.draw_networkx_nodes(V, pos, node_color=colors, node_size=sizes)
   nx.draw_networkx_edges(V, pos, edge_color=colorsEdge, width=widthsEdge, arrowstyle='-|>', arrowsize=20)
   nx.draw_networkx_edge_labels(V, pos, edge_labels=labelsEdge)
-
   plt.axis('off')
 
-  # Disegna le etichette dei nodi usando la posizione aggiustata per tutte le etichette
+  # Legend
+  pinkPatch = mpatches.Patch(color='lightpink', label='Diagnosed disease')
+  if corresponding:
+    bluePatch = mpatches.Patch(color='lightblue', label="Main diagnosis' symptoms")
+  else:
+    bluePatch = mpatches.Patch(color='lightblue', label='Main additional symptoms')
+  khakiPatch = mpatches.Patch(color='khaki', label='Main affected anatomies')
+  mediumpurplePatch = mpatches.Patch(color='mediumpurple', label='Compound information')
+  greyPatch = mpatches.Patch(color='lightgrey', label='Irrelevant symptoms/diseases')
+  salmonPatch = mpatches.Patch(color='salmon', label='Relevant known diseases')
+  lightgreenPatch = mpatches.Patch(color='lightgreen', label='Relevant experimented symptoms')
+  plt.legend(title="Legend", handles=[pinkPatch, lightgreenPatch, greyPatch, salmonPatch, mediumpurplePatch, khakiPatch, bluePatch], loc='upper right', bbox_to_anchor=(1.8, 0.8))
+
+  # Labels
   if singleDisease:
     for node, (x, y) in pos.items():
       if node == diagnosisNodes:
@@ -449,9 +458,7 @@ def visualizeDOC (G,DOCoutput):
         plt.text(x, y + 0.08, labels[node], fontsize=12, ha='center', va='center')
   else:
     for node, (x, y) in pos.items():
-      if node == diagnosisNodes and not singleSymptom:
-        plt.text(x + 0.2, y, labels[node], fontsize=12, ha='left', va='center')
-      elif node == diagnosisNodes and singleSymptom:
+      if node == diagnosisNodes:
         plt.text(x + 0.1, y, labels[node], fontsize=12, ha='left', va='center')
       elif node in {G.nodes[disease]['name'] for disease in patientDiseases}:
         plt.text(x, y - 0.09, labels[node], fontsize=12, ha='center', va='center')
