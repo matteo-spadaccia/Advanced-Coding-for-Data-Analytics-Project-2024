@@ -186,8 +186,6 @@ def chatDOC (G, patient):
             irrelevantSymptoms = irrelevantSymptoms | {relevantSymptom}
       if IO and len(unrecognizedDiseases) > 0:
         print("The following inputs are not recognizable as diseases:", '; '.join(unrecognizedDiseases), "!")
-      if IO and len(irrelevantSymptoms) > 0:
-        print("The following symptoms you are experiencing seem to be uncorrelated to the main ones: ", '; '.join([G.nodes[symptom]['name'] for symptom in irrelevantSymptoms]), "!")
 
   # Asking for eventually recognizable secondary symptoms (proposing them on an inverse-similarity basis wrt the main one), which could reveal the actual disease
   if IO and len(possibleDiseases) > 1:
