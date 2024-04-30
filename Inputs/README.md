@@ -1,11 +1,11 @@
 # Inputs information
 The object of analysis is the publicly-available Hetionet biological knowledge graph, which is stored as two separate files:
-- edges.sif - edge file listing information about all connections between the set of heterogeneous entities
-- nodes.tsv - node file listing the unique ID, name and kind of all entities in the graph
+- edge - file listing information about all connections between the set of heterogeneous entities
+- node file - listing the unique ID, name and kind of all entities in the graph
 
 > **References**:
->- https://het.io/about/
->- https://github.com/hetio/hetionet/tree/master/hetnet/tsv
+>* https://het.io/about/
+>* https://github.com/hetio/hetionet/tree/master/hetnet/tsv
 
 ## Edges data format
 `hetionet-v1.0-edges.sif.gz` is a gzipped TSV table of network edges, formatted like:
