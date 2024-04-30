@@ -75,7 +75,7 @@ def chatDOC (G, patient):
         print("Input not recognized, please just answer yes or no to the following question!")
         YN = input("Do you already recognize specific other symptoms?\t[Y/N]\t").lower()
       if YN in ['y', 'yes']:
-        secondarySymptoms = [x.strip() for x in input("Please specify all already recognized secondary symptoms ordered by relevance and separated by commas:\t").split(sep=',')]
+        secondarySymptoms = [x.strip() for x in input("Please specify all already recognized secondary symptoms ordered by relevance and separated by ';':\t").split(sep=';')]
         doResearch = True
     elif not IO:
       secondarySymptoms = symptoms[1:]
@@ -139,7 +139,7 @@ def chatDOC (G, patient):
         print("Input not recognized, please just answer yes or no to the following question!")
         YN = input("Have you already been diagnosed with other diseases?\t[Y/N]\t").lower()
       if YN in ['y', 'yes']:
-        secondaryDiseases = [x.strip() for x in input("Please specify all already diagnosed diseases ordered by relevance and separated by commas:\t").split(sep=',')]
+        secondaryDiseases = [x.strip() for x in input("Please specify all already diagnosed diseases ordered by relevance and separated by ';':\t").split(sep=';')]
         doResearch = True
     if not IO or doResearch:
       for disease in secondaryDiseases:
@@ -395,10 +395,10 @@ def visualizeDOC (G,DOCoutput):
     disease = G.nodes[disease]['name']
     if (singleDisease and disease == diagnosisNodes) or (not singleDisease and disease in listPossibleDiseases2):
       corresponding = True
-      disease = 'malattia'
-      V.add_node(disease, color='lightpink', type='patient', label=diagnosisNodes)
-      posPatient[disease] = (-1, z)
-      V.add_edge(diagnosisNodes, disease, color='lightpink', width=4.0, label = 'corresponding')
+      disease1 = 'malattia'
+      V.add_node(disease1, color='lightpink', type='patient', label=disease)
+      posPatient[disease1] = (-1, z)
+      V.add_edge(diagnosisNodes, disease1, color='lightpink', width=4.0, label = 'corresponding')
       z += increment
     elif disease in patientRelevantDiseases2:
       V.add_node(disease, color='salmon', type='patient', label=disease)
