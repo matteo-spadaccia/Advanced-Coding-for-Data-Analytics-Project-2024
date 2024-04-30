@@ -4,6 +4,7 @@ The object of analysis is the publicly-available Hetionet biological knowledge g
 - node file - listing the unique ID, name and kind of all entities in the graph
 
 > **References**:
+> 
 > https://het.io/about/
 > 
 > https://github.com/hetio/hetionet/tree/master/hetnet/tsv
