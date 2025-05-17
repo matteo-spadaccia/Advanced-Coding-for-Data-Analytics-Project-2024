@@ -4,3 +4,5 @@ Computational biology and bioinformatics focus on understanding the intricate ne
 From a computer science perspective, any biological entity can be represented as a node in the network, while interactions are modelled as edges. These graphs are thus typically heterogenous: nodes can represent different types of entity and multiple meanings are attributable to the directed links beetween each source-target couple.
 
 In this project, we implement some of the aforementioned techniques to analyze the publicly-available Hetionet biological knowledge graph (more details in the Inputs README) and produce significant insights.
+
+![Graph structure](graph_structure.jpg)
